@@ -1,24 +1,36 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
-
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+import { Stack, useRouter, useSegments } from "expo-router";
+import { useEffect } from "react";
+import { initDb } from "../src/db/db";
+import { hasPin, isLockEnabled } from "../src/security/lock";
+import { isUnlockedThisSession } from "../src/security/session";
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  const router = useRouter();
+  const segments = useSegments();
+
+  useEffect(() => {
+    initDb();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      const enabled = await isLockEnabled();
+      const pinOk = await hasPin();
+
+      const inAuth = segments[0] === "(auth)";
+
+      // ✅ Only force unlock if NOT unlocked in this app session
+      if (enabled && pinOk && !inAuth && !isUnlockedThisSession()) {
+        router.replace({ pathname: "/unlock" }); // cleaner path
+      }
+    })();
+  }, [segments]);
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="index" />
+      <Stack.Screen name="(auth)" />
+      <Stack.Screen name="(tabs)" />
+    </Stack>
   );
 }
